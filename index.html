@@ -86,25 +86,30 @@
   .pm-item:hover { background: #0a246a; color: #fff; }
   .pm-item .status { width: 9px; height: 9px; min-width: 9px; border-radius: 50%; }
 
-  /* chat windows */
-  .chat-dock {
-    position: fixed; right: 16px; bottom: 16px; z-index: 60;
-    display: flex; flex-direction: row-reverse; align-items: flex-end; gap: 10px;
-    max-width: calc(100vw - 32px);
-  }
+  /* chat windows — free-floating and draggable */
+  .chat-dock { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
   .chat {
-    position: relative; width: 320px; height: 420px;
+    position: absolute; width: 320px; height: 420px;
     background: #d4d0c8; border: 2px outset #fff;
     display: flex; flex-direction: column; box-shadow: 3px 3px 12px rgba(0,0,0,.35);
-    font-family: Tahoma, Verdana, Arial, sans-serif; flex: 0 0 auto;
+    font-family: Tahoma, Verdana, Arial, sans-serif; pointer-events: auto;
   }
-  .chat-min { height: auto; width: 190px; }
+  .chat.dragging { opacity: 0.92; box-shadow: 5px 5px 22px rgba(0,0,0,.45); }
+  .chat-min { height: auto !important; }
   .chat-min .chat-msgs, .chat-min .chat-input { display: none; }
   .chat-head {
     display: flex; align-items: center; gap: 8px; padding: 4px 6px;
     background: linear-gradient(90deg, #0a246a, #3a6ea5, #a6caf0); color: #fff;
+    cursor: move; user-select: none;
   }
-  .chat-min .chat-head { cursor: pointer; }
+
+  /* buddy icons */
+  .avatar {
+    width: 20px; height: 20px; min-width: 20px; border-radius: 3px;
+    object-fit: cover; border: 1px solid #808080; background: #fff;
+  }
+  .avatar-lg { width: 44px; height: 44px; border-radius: 4px; object-fit: cover; border: 1px solid #808080; background: #fff; }
+  .icon-drop { display: flex; align-items: center; gap: 12px; }
   .chat-head b { flex: 1; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat-head .badge { background: #d40000; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 6px; }
   .chat-head .ghost {
@@ -177,10 +182,22 @@
   <div class="spacer"></div>
   <div class="me hidden" id="me">
     <span class="udot" id="me-dot"></span>Signed in as <b id="me-name"></b>
+    <label class="chat-attach" title="Set your buddy icon" style="font-size:13px;margin-left:8px">🖼<input type="file" accept="image/*" hidden onchange="uploadAvatar(this)"></label>
+    <button id="btn-manage" class="hidden" title="Manage users">👥 Users</button>
     <button id="btn-presence" title="Set your status">🟢 Available ▾</button>
     <button id="btn-switch">Sign out</button>
   </div>
 </header>
+
+<!-- manage users (admin only) -->
+<div class="overlay hidden" id="manage-modal">
+  <div class="modal">
+    <h2>Manage users</h2>
+    <p>Remove profiles from the buddy list. This also deletes that person's messages. You can't remove yourself.</p>
+    <div class="user-list" id="manage-list"></div>
+    <button id="manage-close">Done</button>
+  </div>
+</div>
 
 <!-- presence / away / sign-off menu -->
 <div class="pmenu hidden" id="pmenu">
@@ -243,12 +260,18 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "sb_publishable_vP4R3fZFvaWXo1VK0tX93A_uHlKsRQs",
 };
 /* ------------------------------------------------------------
-   Presence + login passcodes need these columns on users
-   (run once in Supabase SQL Editor — safe if already done):
+   Run once in Supabase SQL Editor (safe to re-run):
 
      alter table users add column if not exists status text;
      alter table users add column if not exists away_message text;
      alter table users add column if not exists pin_hash text;
+     alter table users add column if not exists avatar_path text;
+     alter table users add column if not exists is_admin boolean default false;
+
+   Then make yourself the admin (only admins can remove users) —
+   change the name to match your profile exactly:
+
+     update users set is_admin = true where name = 'Don';
    ============================================================ */
 
 const COLORS = ["#2563eb","#16a34a","#d97706","#dc2626","#7c3aed","#0891b2","#db2777","#4b5563"];
@@ -262,6 +285,12 @@ const minimized = new Set();
 const awayReplied = {};
 window.drafts = {};
 window.focusUid = null;
+
+/* chat window positions {uid: {x, y}} — remembered between visits */
+let winPos = {};
+try { winPos = JSON.parse(localStorage.getItem("msgr_winpos") || "{}"); } catch (e) { winPos = {}; }
+const saveWinPos = () => localStorage.setItem("msgr_winpos", JSON.stringify(winPos));
+let zTop = 60;
 
 let meStatus = localStorage.getItem("msgr_status") || "available";
 let meAway = localStorage.getItem("msgr_away") || "";
@@ -457,10 +486,108 @@ window.goAway = () => {
 
 async function loadUsers() {
   const { data } = await db.from("users").select("*").order("name");
-  if (data) { teamUsers = data; renderTeam(); if (openChats.length) renderChats(); }
+  if (data) {
+    teamUsers = data;
+    // keep my own row in sync (admin flag, avatar, etc.)
+    const mine = data.find(u => u.id === meUser.id);
+    if (mine) meUser = { ...meUser, ...mine };
+    $("btn-manage").classList.toggle("hidden", !isAdmin());
+    renderTeam();
+    if (openChats.length) renderChats();
+    if (!$("manage-modal").classList.contains("hidden")) renderManage();
+  }
 }
 
 const sname = (u) => u.username || u.name;
+
+/* ---------- buddy icons ---------- */
+const avatarUrl = (p) => p ? db.storage.from("attachments").getPublicUrl(p).data.publicUrl : null;
+function avatarImg(u, cls) {
+  const url = avatarUrl(u.avatar_path);
+  if (url) return `<img class="${cls}" src="${url}" alt="">`;
+  const initial = esc((u.name || "?").charAt(0).toUpperCase());
+  return `<span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:${esc(u.color || "#4b5563")}">${initial}</span>`;
+}
+window.uploadAvatar = async (input) => {
+  const file = input.files[0]; input.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) { alert("Pick an image file."); return; }
+  if (file.size > 3 * 1024 * 1024) { alert("Buddy icon must be under 3 MB."); return; }
+  const path = `avatars/${meUser.id}-${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+  const { error } = await db.storage.from("attachments").upload(path, file);
+  if (error) { alert("Upload failed: " + error.message); return; }
+  const { error: e2 } = await db.from("users").update({ avatar_path: path }).eq("id", meUser.id);
+  if (e2) {
+    alert(/column|schema cache/i.test(e2.message || "")
+      ? "Add the avatar_path column in Supabase first — see the CONFIG notes in index.html."
+      : "Could not save icon: " + e2.message);
+    return;
+  }
+  meUser.avatar_path = path;
+  loadUsers(); renderChats();
+};
+
+/* ---------- admin: manage users ---------- */
+const isAdmin = () => !!(meUser && meUser.is_admin);
+window.openManage = () => { renderManage(); $("manage-modal").classList.remove("hidden"); };
+function renderManage() {
+  $("manage-list").innerHTML = teamUsers.map(u => {
+    const me = u.id === meUser.id;
+    return `<div class="user-row" style="cursor:default">
+      ${avatarImg(u, "avatar")}
+      <span style="flex:1"><b>${esc(u.name)}</b>${u.title ? `<div class="sub">${esc(u.title)}</div>` : ""}</span>
+      ${me ? `<span class="sub">you</span>`
+           : `<button onclick="removeUser('${u.id}')" style="color:#dc2626;border-color:#dc2626">Remove</button>`}
+    </div>`;
+  }).join("");
+}
+window.removeUser = async (id) => {
+  if (!isAdmin() || id === meUser.id) return;
+  const u = teamUsers.find(x => x.id === id); if (!u) return;
+  if (!confirm(`Remove ${u.name}?\n\nThis deletes their profile and every message to or from them. This can't be undone.`)) return;
+  await db.from("messages").delete().or(`from_user.eq.${id},to_user.eq.${id}`);
+  const { error } = await db.from("users").delete().eq("id", id);
+  if (error) { alert("Could not remove: " + error.message); return; }
+  openChats = openChats.filter(x => x !== id);
+  minimized.delete(id); delete winPos[id]; saveWinPos();
+  await loadUsers(); await loadMsgs();
+  renderManage();
+};
+
+/* ---------- draggable chat windows ---------- */
+let dragState = null;
+function defaultPos(i) {
+  const x = Math.max(12, window.innerWidth - 320 - 24 - i * 28);
+  const y = Math.max(12, window.innerHeight - 420 - 24 - i * 12);
+  return { x, y };
+}
+window.bringToFront = (uid) => {
+  const el = $("win-" + uid);
+  if (el) el.style.zIndex = ++zTop;
+};
+window.startDrag = (e, uid) => {
+  if (e.button !== 0) return;
+  const el = $("win-" + uid); if (!el) return;
+  bringToFront(uid);
+  const r = el.getBoundingClientRect();
+  dragState = { uid, el, dx: e.clientX - r.left, dy: e.clientY - r.top };
+  el.classList.add("dragging");
+  e.preventDefault();
+};
+addEventListener("mousemove", (e) => {
+  if (!dragState) return;
+  const x = Math.max(0, Math.min(window.innerWidth - 80, e.clientX - dragState.dx));
+  const y = Math.max(0, Math.min(window.innerHeight - 28, e.clientY - dragState.dy));
+  dragState.el.style.left = x + "px";
+  dragState.el.style.top = y + "px";
+  winPos[dragState.uid] = { x, y };
+});
+addEventListener("mouseup", () => {
+  if (!dragState) return;
+  dragState.el.classList.remove("dragging");
+  dragState = null;
+  saveWinPos();
+});
 
 function userStatus(u) {
   if (u.status === "invisible") return "off";
@@ -499,6 +626,7 @@ function renderTeam() {
     return `<div class="team-row ${st === "off" ? "offline" : ""}" title="${tip}${u.title ? " · " + esc(u.title) : ""}${isMe ? " · you" : " · click to message"}"
       ${isMe ? "" : `onclick="openChat('${u.id}')"`}>
       <span class="status ${st}"></span>
+      ${avatarImg(u, "avatar")}
       <span class="who-wrap">
         <span class="who">${esc(sname(u))}${isMe ? " (you)" : ""}</span>
         ${isAway ? `<span class="who-sub">Away — <i>${partial}</i></span>` : ""}
@@ -566,17 +694,22 @@ function renderChats() {
   syncDrafts();
   $("desk-hint").style.display = openChats.length ? "none" : "flex";
   const dock = $("chat-dock"); if (!dock) return;
-  dock.innerHTML = openChats.map(uid => {
+  dock.innerHTML = openChats.map((uid, idx) => {
     const u = teamUsers.find(x => x.id === uid); if (!u) return "";
     const st = userStatus(u);
     const unread = msgs.filter(m => m.from_user === uid && m.to_user === meUser.id && !m.read).length;
+    if (!winPos[uid]) winPos[uid] = defaultPos(idx);
+    const p = winPos[uid];
+    const at = `style="left:${p.x}px; top:${p.y}px"`;
     if (minimized.has(uid)) {
-      return `<div class="chat chat-min">
-        <div class="chat-head" onclick="restoreChat('${uid}')">
+      return `<div class="chat chat-min" id="win-${uid}" ${at}>
+        <div class="chat-head" onmousedown="startDrag(event,'${uid}')">
           <span class="status ${st}"></span>
+          ${avatarImg(u, "avatar")}
           <b>${esc(sname(u))}</b>
           ${unread ? `<span class="badge">${unread}</span>` : ""}
-          <button class="ghost" onclick="event.stopPropagation();closeChat('${uid}')" title="Close">✕</button>
+          <button class="ghost" onmousedown="event.stopPropagation()" onclick="restoreChat('${uid}')" title="Restore">▢</button>
+          <button class="ghost" onmousedown="event.stopPropagation()" onclick="closeChat('${uid}')" title="Close">✕</button>
         </div>
       </div>`;
     }
@@ -598,12 +731,13 @@ function renderChats() {
       const ar = awayReplied[uid];
       body += `<div class="msg theirs auto"><span class="sn">${esc(sname(u))}:</span> <b>Away</b> <i>${linkify(ar.msg)}</i><span class="t">${new Date(ar.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>`;
     }
-    return `<div class="chat">
-      <div class="chat-head">
+    return `<div class="chat" id="win-${uid}" ${at} onmousedown="bringToFront('${uid}')">
+      <div class="chat-head" onmousedown="startDrag(event,'${uid}')">
         <span class="status ${st}"></span>
+        ${avatarImg(u, "avatar")}
         <b>${esc(sname(u))}</b>
-        <button class="ghost" onclick="minimizeChat('${uid}')" title="Minimize">_</button>
-        <button class="ghost" onclick="closeChat('${uid}')" title="Close">✕</button>
+        <button class="ghost" onmousedown="event.stopPropagation()" onclick="minimizeChat('${uid}')" title="Minimize">_</button>
+        <button class="ghost" onmousedown="event.stopPropagation()" onclick="closeChat('${uid}')" title="Close">✕</button>
       </div>
       <div class="chat-msgs" id="msgs-${uid}">${body}</div>
       <div class="chat-input">
@@ -697,6 +831,8 @@ $("acct-name").addEventListener("keydown", e => { if (e.key === "Enter") $("acct
 $("acct-pin").addEventListener("keydown", e => { if (e.key === "Enter") $("acct-create").click(); });
 
 $("btn-switch").onclick = () => { localStorage.removeItem("tb_user_id"); location.reload(); };
+$("btn-manage").onclick = () => openManage();
+$("manage-close").onclick = () => $("manage-modal").classList.add("hidden");
 $("btn-presence").onclick = (e) => { e.stopPropagation(); $("pmenu").classList.toggle("hidden"); };
 addEventListener("click", () => $("pmenu").classList.add("hidden"));
 
