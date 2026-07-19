@@ -280,9 +280,12 @@ function tone(freq, dur, opts = {}) {
     o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
   } catch (e) {}
 }
+// Optional custom sound files: drop imrecv.mp3, imsend.mp3, dooropen.mp3 and
+// doorclose.mp3 in the repo root (next to index.html) and they're used
+// automatically; otherwise the synthesized fallbacks below play.
 const customSnd = {};
 ["imrecv", "imsend", "dooropen", "doorclose"].forEach(n => {
-  const a = new Audio("sounds/" + n + ".mp3");
+  const a = new Audio(n + ".mp3");
   a.addEventListener("canplaythrough", () => { customSnd[n] = a; }, { once: true });
   a.addEventListener("error", () => {}, { once: true });
 });
