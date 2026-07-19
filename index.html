@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messenger</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #fff; --ink: #1d2129; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #2563eb; --green: #16a34a; --red: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: linear-gradient(160deg, #6ea0d8, #3a6ea5); color: var(--ink);
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 12px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header .spacer { flex: 1; }
+  .me { font-size: 13px; color: var(--muted); }
+  .me b { color: var(--ink); }
+  .me button { margin-left: 8px; }
+  .me .udot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  button {
+    font: inherit; cursor: pointer; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); border-radius: 8px; padding: 6px 12px;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.ghost { border: none; background: none; color: var(--muted); padding: 4px 6px; }
+  input, select {
+    font: inherit; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; background: #fff; color: var(--ink); width: 100%;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  /* desktop */
+  .desk { flex: 1; position: relative; display: flex; overflow: hidden; }
+  .desk-hint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #eaf1fb; font-size: 15px; opacity: 0.85; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+
+  /* buddy list window (AIM-style) */
+  .buddy-window {
+    width: 260px; margin: 14px; align-self: flex-start; max-height: calc(100% - 28px);
+    background: #d4d0c8; border: 2px outset #fff; box-shadow: 2px 2px 10px rgba(0,0,0,.3);
+    display: flex; flex-direction: column; overflow: hidden; z-index: 5;
+  }
+  .tp-title {
+    background: linear-gradient(90deg, #0a246a, #3a6ea5, #a6caf0);
+    color: #fff; font-size: 12px; font-weight: 700; padding: 5px 8px;
+    font-family: Tahoma, Verdana, Arial, sans-serif; display: flex; align-items: center; gap: 6px;
+  }
+  .buddy-list { overflow-y: auto; padding: 6px 0 8px; }
+  .grp-title { font-size: 11px; font-weight: 700; color: #333; padding: 6px 8px 2px; font-family: Tahoma, Verdana, Arial, sans-serif; }
+  .team-row { display: flex; align-items: center; gap: 8px; padding: 3px 10px; font-size: 12px; cursor: pointer; margin: 0 4px; font-family: Tahoma, Verdana, Arial, sans-serif; }
+  .team-row:hover { background: #0a246a; color: #fff; }
+  .team-row .status { width: 9px; height: 9px; min-width: 9px; border-radius: 50%; }
+  .status.on { background: #16a34a; }
+  .status.idle { background: #eab308; }
+  .status.away { background: #eab308; }
+  .status.off { background: #dc2626; }
+  .team-row .who-wrap { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .team-row .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team-row.offline .who { color: #777; }
+  .team-row:hover.offline .who { color: #cfe0f5; }
+  .team-row .who-sub { font-size: 10px; color: #7a5c00; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team-row:hover .who-sub { color: #cfe0f5; }
+  .team-row .badge { background: #d40000; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 6px; margin-left: auto; }
+  .team-row .edit-sn { cursor: pointer; margin-left: auto; font-size: 11px; opacity: 0.7; }
+  .team-row .edit-sn:hover { opacity: 1; }
+
+  /* presence menu */
+  .pmenu {
+    position: fixed; top: 50px; right: 16px; z-index: 90;
+    background: #d4d0c8; border: 2px outset #fff; box-shadow: 2px 2px 8px rgba(0,0,0,.3);
+    font-family: Tahoma, Verdana, Arial, sans-serif;
+  }
+  .pm-item { padding: 6px 16px 6px 10px; font-size: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
+  .pm-item:hover { background: #0a246a; color: #fff; }
+  .pm-item .status { width: 9px; height: 9px; min-width: 9px; border-radius: 50%; }
+
+  /* chat windows */
+  .chat-dock {
+    position: fixed; right: 16px; bottom: 16px; z-index: 60;
+    display: flex; flex-direction: row-reverse; align-items: flex-end; gap: 10px;
+    max-width: calc(100vw - 32px);
+  }
+  .chat {
+    position: relative; width: 320px; height: 420px;
+    background: #d4d0c8; border: 2px outset #fff;
+    display: flex; flex-direction: column; box-shadow: 3px 3px 12px rgba(0,0,0,.35);
+    font-family: Tahoma, Verdana, Arial, sans-serif; flex: 0 0 auto;
+  }
+  .chat-min { height: auto; width: 190px; }
+  .chat-min .chat-msgs, .chat-min .chat-input { display: none; }
+  .chat-head {
+    display: flex; align-items: center; gap: 8px; padding: 4px 6px;
+    background: linear-gradient(90deg, #0a246a, #3a6ea5, #a6caf0); color: #fff;
+  }
+  .chat-min .chat-head { cursor: pointer; }
+  .chat-head b { flex: 1; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-head .badge { background: #d40000; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 6px; }
+  .chat-head .ghost {
+    background: #d4d0c8; color: #000; border: 2px outset #fff; border-radius: 0;
+    width: 18px; height: 18px; padding: 0; font-size: 10px; line-height: 1;
+  }
+  .chat-head .ghost:active { border-style: inset; }
+  .chat-msgs {
+    flex: 1; overflow-y: auto; padding: 6px; margin: 6px;
+    background: #fff; border: 2px inset #808080;
+    font-family: Arial, Helvetica, sans-serif; font-size: 13px;
+  }
+  .chat-msgs a { color: #0000cc; text-decoration: underline; word-break: break-all; }
+  .msg { padding: 1px 2px; overflow-wrap: break-word; color: #000; }
+  .msg .sn { font-weight: 700; }
+  .msg.mine .sn { color: #d40000; }
+  .msg.theirs .sn { color: #0000cc; }
+  .msg.auto { color: #7a5c00; }
+  .msg.auto i { color: #7a5c00; }
+  .msg .t { font-size: 10px; color: #999; margin-left: 6px; }
+  .chat-input { display: flex; gap: 6px; padding: 0 6px 6px; }
+  .chat-input input { font-size: 13px; border: 2px inset #808080; border-radius: 0; font-family: Arial, Helvetica, sans-serif; background: #fff; }
+  .chat-input button { white-space: nowrap; background: #d4d0c8; border: 2px outset #fff; border-radius: 0; color: #000; font-weight: 700; font-size: 12px; font-family: Tahoma, Verdana, Arial, sans-serif; }
+  .chat-input button:active { border-style: inset; }
+  .chat-attach { cursor: pointer; align-self: center; padding: 0 2px; font-size: 15px; }
+  .im-img { display: block; max-width: 200px; max-height: 160px; border: 1px solid #999; margin: 3px 0; cursor: zoom-in; }
+  .filechip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 8px;
+    background: #f3f4f6; border-radius: 6px; color: var(--ink); text-decoration: none;
+    max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* lightbox */
+  .lightbox { position: fixed; inset: 0; background: rgba(15,17,21,.88); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 30px; cursor: zoom-out; }
+  .lightbox img { max-width: 92vw; max-height: 86vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .lightbox .lb-name { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; color: #fff; font-size: 13px; opacity: .85; }
+  .lightbox .lb-close { position: absolute; top: 14px; right: 20px; color: #fff; font-size: 26px; background: none; border: none; cursor: pointer; }
+
+  /* modals */
+  .overlay { position: fixed; inset: 0; background: rgba(15,17,21,.55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .modal { background: var(--card); border-radius: 14px; padding: 24px; width: 100%; max-width: 380px; display: grid; gap: 12px; }
+  .modal h2 { font-size: 17px; }
+  .modal p { font-size: 13px; color: var(--muted); }
+  .hidden { display: none !important; }
+  .color-row { display: flex; gap: 8px; }
+  .swatch { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .swatch.sel { border-color: var(--ink); }
+  .user-list { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; }
+  .user-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+  .user-row:hover { border-color: var(--accent); }
+  .user-row .udot { width: 12px; height: 12px; min-width: 12px; border-radius: 50%; }
+  .user-row .sub { font-size: 12px; color: var(--muted); }
+  .modal .divider { border-top: 1px solid var(--line); margin: 4px 0; }
+  .setup { max-width: 620px; margin: 60px auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+  .setup h2 { margin-bottom: 12px; }
+  .setup ol { margin: 12px 0 0 20px; line-height: 1.7; font-size: 14px; }
+  .setup code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+  @media (max-width: 640px) {
+    .buddy-window { width: calc(100% - 28px); }
+    .chat-dock { flex-wrap: wrap; }
+    .chat { width: calc(100vw - 32px); max-width: 340px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📟 Messenger</h1>
+  <div class="spacer"></div>
+  <div class="me hidden" id="me">
+    <span class="udot" id="me-dot"></span>Signed in as <b id="me-name"></b>
+    <button id="btn-presence" title="Set your status">🟢 Available ▾</button>
+    <button id="btn-switch">Sign out</button>
+  </div>
+</header>
+
+<!-- presence / away / sign-off menu -->
+<div class="pmenu hidden" id="pmenu">
+  <div class="pm-item" onclick="setPresence('available')"><span class="status on"></span> Available</div>
+  <div class="pm-item" onclick="goAway()"><span class="status away"></span> Away… (set message)</div>
+  <div class="pm-item" onclick="setPresence('invisible')"><span class="status off"></span> Sign off (appear offline)</div>
+</div>
+
+<div class="desk hidden" id="app">
+  <div class="desk-hint" id="desk-hint">Click a buddy to start a conversation.</div>
+  <aside class="buddy-window">
+    <div class="tp-title">👥 Buddy List</div>
+    <div class="buddy-list" id="team-list"></div>
+  </aside>
+  <div class="chat-dock" id="chat-dock"></div>
+</div>
+
+<!-- setup instructions shown when not configured -->
+<div id="setup" class="setup hidden">
+  <h2>One-time setup</h2>
+  <p>This messenger uses a free Supabase project as its shared backend — the same one your Task Board uses.</p>
+  <ol>
+    <li>Open <code>index.html</code> and paste your Supabase <b>Project URL</b> and <b>anon public</b> key into the <code>CONFIG</code> block near the bottom (identical to the Task Board values).</li>
+    <li>Make sure the <code>users</code> and <code>messages</code> tables exist (see <code>README.md</code>).</li>
+    <li>Commit and push. Everyone with the link shares the same buddy list and messages.</li>
+  </ol>
+</div>
+
+<!-- image lightbox -->
+<div class="lightbox hidden" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-close" title="Close">✕</button>
+  <img id="lb-img" src="" alt="">
+  <div class="lb-name" id="lb-name"></div>
+</div>
+
+<!-- account modal -->
+<div class="overlay hidden" id="account-modal">
+  <div class="modal">
+    <h2>Who are you?</h2>
+    <p>Pick your profile, or create one. Picking a profile requires that person's passcode.</p>
+    <div class="user-list" id="user-list"></div>
+    <div class="divider"></div>
+    <p><b>New here?</b> Create your profile:</p>
+    <input id="acct-name" placeholder="Name (required)" maxlength="30">
+    <input id="acct-username" placeholder="Screen name (optional, shows in messenger)" maxlength="24">
+    <input id="acct-email" placeholder="Email (optional)" maxlength="80">
+    <input id="acct-title" placeholder="Role / title (optional)" maxlength="60">
+    <input id="acct-pin" type="password" placeholder="Passcode (required, min 4 chars)" maxlength="40" autocomplete="new-password">
+    <div class="color-row" id="acct-colors"></div>
+    <button class="primary" id="acct-create">Create profile</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — same Supabase project as the Task Board
+   ============================================================ */
+const CONFIG = {
+  SUPABASE_URL: "https://hwgjmsmzoicfsmookadh.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_vP4R3fZFvaWXo1VK0tX93A_uHlKsRQs",
+};
+/* ------------------------------------------------------------
+   Presence + login passcodes need these columns on users
+   (run once in Supabase SQL Editor — safe if already done):
+
+     alter table users add column if not exists status text;
+     alter table users add column if not exists away_message text;
+     alter table users add column if not exists pin_hash text;
+   ============================================================ */
+
+const COLORS = ["#2563eb","#16a34a","#d97706","#dc2626","#7c3aed","#0891b2","#db2777","#4b5563"];
+const $ = (id) => document.getElementById(id);
+
+let db, meUser = null, teamUsers = [], msgs = [], acctColor = COLORS[0];
+let msgsLoadedOnce = false;
+
+let openChats = [];
+const minimized = new Set();
+const awayReplied = {};
+window.drafts = {};
+window.focusUid = null;
+
+let meStatus = localStorage.getItem("msgr_status") || "available";
+let meAway = localStorage.getItem("msgr_away") || "";
+
+/* ---------- retro IM sounds ---------- */
+let _actx;
+function actx() { return _actx || (_actx = new (window.AudioContext || window.webkitAudioContext)()); }
+function tone(freq, dur, opts = {}) {
+  try {
+    const ctx = actx(); const t0 = ctx.currentTime + (opts.delay || 0);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = opts.type || "sine"; o.frequency.setValueAtTime(freq, t0);
+    if (opts.slideTo) o.frequency.exponentialRampToValueAtTime(opts.slideTo, t0 + dur);
+    g.gain.setValueAtTime(opts.vol || 0.07, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  } catch (e) {}
+}
+const customSnd = {};
+["imrecv", "imsend", "dooropen", "doorclose"].forEach(n => {
+  const a = new Audio("sounds/" + n + ".mp3");
+  a.addEventListener("canplaythrough", () => { customSnd[n] = a; }, { once: true });
+  a.addEventListener("error", () => {}, { once: true });
+});
+function play(n, fb) { const a = customSnd[n]; if (a) { try { a.currentTime = 0; a.play(); return; } catch (e) {} } fb(); }
+function sndMessage() { play("imrecv", () => { tone(1319, 0.10, { vol: 0.06 }); tone(1319, 0.16, { vol: 0.05, delay: 0.11 }); }); }
+function sndSent() { play("imsend", () => { tone(330, 0.07, { type: "square", vol: 0.05 }); tone(165, 0.10, { type: "triangle", vol: 0.06, delay: 0.02 }); }); }
+function sndDoorOpen() { play("dooropen", () => { tone(110, 0.35, { type: "sawtooth", vol: 0.05, slideTo: 260 }); tone(55, 0.30, { type: "triangle", vol: 0.05, slideTo: 110 }); }); }
+function sndDoorClose() { play("doorclose", () => { tone(260, 0.28, { type: "sawtooth", vol: 0.05, slideTo: 90 }); tone(75, 0.12, { type: "square", vol: 0.07, delay: 0.26 }); }); }
+let lastActivity = Date.now();
+["mousemove", "keydown", "click", "touchstart", "scroll"].forEach(ev =>
+  addEventListener(ev, () => { lastActivity = Date.now(); }, { passive: true }));
+
+function esc(s) { return (s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function linkify(s) {
+  return esc(s).replace(/((?:https?:\/\/|www\.)[^\s<]+)/gi, (u) => {
+    let href = u, tail = "";
+    const m = href.match(/[),.;:!?]+$/); if (m) { tail = m[0]; href = href.slice(0, -tail.length); }
+    const full = href.startsWith("http") ? href : "http://" + href;
+    return `<a href="${full}" target="_blank" rel="noopener noreferrer">${href}</a>` + tail;
+  });
+}
+async function hashPin(pin) {
+  const s = "tb:" + pin;
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch (e) {
+    let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return "f" + (h >>> 0).toString(16);
+  }
+}
+
+async function init() {
+  if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) { $("setup").classList.remove("hidden"); return; }
+  db = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  const uid = localStorage.getItem("tb_user_id");
+  if (uid) {
+    const { data } = await db.from("users").select("*").eq("id", uid).maybeSingle();
+    if (data) { meUser = data; start(); return; }
+    localStorage.removeItem("tb_user_id");
+  }
+  showPicker();
+}
+
+async function showPicker() {
+  const { data, error } = await db.from("users").select("*").order("name");
+  if (error) { alert("Database error: " + error.message); return; }
+  $("user-list").innerHTML = (data && data.length)
+    ? data.map(u => `<div class="user-row" onclick="pickUser('${u.id}')">
+        <span class="udot" style="background:${esc(u.color || "#4b5563")}"></span>
+        <span><b>${esc(u.name)}</b>${u.title ? `<div class="sub">${esc(u.title)}</div>` : ""}</span>
+      </div>`).join("")
+    : `<div class="user-row" style="cursor:default; color:var(--muted); font-size:13px">No profiles yet — create the first one below.</div>`;
+  $("acct-colors").innerHTML = COLORS.map(c =>
+    `<div class="swatch ${c === acctColor ? "sel" : ""}" style="background:${c}" onclick="pickAcctColor('${c}')"></div>`).join("");
+  $("account-modal").classList.remove("hidden");
+}
+
+window.pickUser = async (id) => {
+  const { data } = await db.from("users").select("*").eq("id", id).maybeSingle();
+  if (!data) return;
+  if (data.pin_hash) {
+    const pin = prompt(`Enter ${data.name}'s passcode:`);
+    if (pin === null) return;
+    if (await hashPin(pin.trim()) !== data.pin_hash) { alert("Incorrect passcode."); return; }
+  } else {
+    const pin = prompt(`${data.name} has no passcode yet. Set one now to secure this profile:`);
+    if (pin === null) return;
+    const p = pin.trim();
+    if (p.length < 4) { alert("Passcode must be at least 4 characters."); return; }
+    const h = await hashPin(p);
+    const { error } = await db.from("users").update({ pin_hash: h }).eq("id", id);
+    if (error && !/column|schema cache/i.test(error.message || "")) { alert("Could not set passcode: " + error.message); return; }
+    if (error) alert("Heads up: run the pin_hash column SQL (see index.html CONFIG) so passcodes are enforced for everyone.");
+    data.pin_hash = h;
+  }
+  meUser = data;
+  localStorage.setItem("tb_user_id", data.id);
+  $("account-modal").classList.add("hidden");
+  start();
+};
+
+window.pickAcctColor = (c) => {
+  acctColor = c;
+  document.querySelectorAll("#acct-colors .swatch").forEach(s => s.classList.toggle("sel", s.getAttribute("onclick").includes(c)));
+};
+
+function start() {
+  $("app").classList.remove("hidden");
+  $("me").classList.remove("hidden");
+  $("me-name").textContent = sname(meUser);
+  $("me-dot").style.background = meUser.color || "#4b5563";
+  updatePresenceBtn();
+  loadUsers();
+  loadMsgs();
+  updateMe({ status: meStatus, away_message: meStatus === "away" ? meAway : null, last_seen: meStatus === "invisible" ? null : new Date().toISOString() });
+  heartbeat();
+  setInterval(heartbeat, 60000);
+  setInterval(renderTeam, 30000);
+  db.channel("messenger")
+    .on("postgres_changes", { event: "*", schema: "public", table: "users" }, loadUsers)
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, loadMsgs)
+    .subscribe();
+}
+
+async function updateMe(fields) {
+  let { error } = await db.from("users").update(fields).eq("id", meUser.id);
+  if (error && /column|schema cache/i.test(error.message || "")) {
+    const { status, away_message, ...rest } = fields;
+    if (Object.keys(rest).length) await db.from("users").update(rest).eq("id", meUser.id);
+  }
+}
+
+async function heartbeat() {
+  if (meStatus === "invisible") return;
+  if (meStatus === "available" && Date.now() - lastActivity > 120000) return;
+  await updateMe({ last_seen: new Date().toISOString(), status: meStatus, away_message: meStatus === "away" ? meAway : null });
+}
+
+/* ---------- presence ---------- */
+function updatePresenceBtn() {
+  const b = $("btn-presence"); if (!b) return;
+  const map = { available: ["🟢", "Available"], away: ["🟡", "Away"], invisible: ["⚫", "Signed off"] };
+  const [icon, label] = map[meStatus] || map.available;
+  b.textContent = icon + " " + label + " ▾";
+}
+window.setPresence = async (status, awayMsg) => {
+  meStatus = status;
+  if (status === "away") meAway = (awayMsg != null ? awayMsg : meAway) || "Away from my desk — back soon.";
+  localStorage.setItem("msgr_status", meStatus);
+  localStorage.setItem("msgr_away", meAway);
+  $("pmenu").classList.add("hidden");
+  updatePresenceBtn();
+  meUser.status = meStatus;
+  meUser.away_message = meStatus === "away" ? meAway : null;
+  const meRow = teamUsers.find(u => u.id === meUser.id);
+  if (meRow) { meRow.status = meStatus; meRow.away_message = meUser.away_message; meRow.last_seen = meStatus === "invisible" ? null : new Date().toISOString(); }
+  await updateMe({ status: meStatus, away_message: meUser.away_message, last_seen: meStatus === "invisible" ? null : new Date().toISOString() });
+  renderTeam(); renderChats();
+};
+window.goAway = () => {
+  const m = prompt("Set your away message:", meAway || "Away from my desk — back soon.");
+  if (m === null) return;
+  setPresence("away", m.trim() || "Away");
+};
+
+async function loadUsers() {
+  const { data } = await db.from("users").select("*").order("name");
+  if (data) { teamUsers = data; renderTeam(); if (openChats.length) renderChats(); }
+}
+
+const sname = (u) => u.username || u.name;
+
+function userStatus(u) {
+  if (u.status === "invisible") return "off";
+  const mins = u.last_seen ? (Date.now() - new Date(u.last_seen).getTime()) / 60000 : Infinity;
+  if (mins > 30) return "off";
+  if (u.status === "away") return "away";
+  if (mins > 10) return "idle";
+  return "on";
+}
+
+const prevStatus = {};
+let statusInit = false;
+
+function renderTeam() {
+  if (!meUser) return;
+  if (statusInit) {
+    for (const u of teamUsers) {
+      if (u.id === meUser.id) continue;
+      const st = userStatus(u), prev = prevStatus[u.id];
+      if (prev && prev !== st) { if (st === "on") sndDoorOpen(); else if (prev === "on" && st === "off") sndDoorClose(); }
+    }
+  }
+  teamUsers.forEach(u => { prevStatus[u.id] = userStatus(u); });
+  statusInit = true;
+
+  const online = teamUsers.filter(u => userStatus(u) !== "off");
+  const offline = teamUsers.filter(u => userStatus(u) === "off");
+  const rowHtml = (u) => {
+    const st = userStatus(u);
+    const label = st === "on" ? "Active" : st === "idle" ? "Idle" : st === "away" ? "Away" : "Inactive";
+    const isAway = st === "away" && u.away_message;
+    const partial = isAway ? (u.away_message.length > 20 ? esc(u.away_message.slice(0, 20)) + "…" : esc(u.away_message)) : "";
+    const tip = isAway ? `Away — ${esc(u.away_message)}` : label;
+    const unread = msgs.filter(m => m.from_user === u.id && m.to_user === meUser.id && !m.read).length;
+    const isMe = u.id === meUser.id;
+    return `<div class="team-row ${st === "off" ? "offline" : ""}" title="${tip}${u.title ? " · " + esc(u.title) : ""}${isMe ? " · you" : " · click to message"}"
+      ${isMe ? "" : `onclick="openChat('${u.id}')"`}>
+      <span class="status ${st}"></span>
+      <span class="who-wrap">
+        <span class="who">${esc(sname(u))}${isMe ? " (you)" : ""}</span>
+        ${isAway ? `<span class="who-sub">Away — <i>${partial}</i></span>` : ""}
+      </span>
+      ${isMe ? `<span class="edit-sn" onclick="event.stopPropagation();editUsername()" title="Edit your screen name">✎</span>` : ""}
+      ${unread ? `<span class="badge">${unread}</span>` : ""}
+    </div>`;
+  };
+  $("team-list").innerHTML =
+    `<div class="grp-title">Online — ${online.length}</div>` +
+    (online.length ? online.map(rowHtml).join("") : `<div class="grp-title" style="font-weight:400;color:#666">Nobody online.</div>`) +
+    (offline.length ? `<div class="grp-title">Offline — ${offline.length}</div>` + offline.map(rowHtml).join("") : "");
+}
+
+/* ---------- messages ---------- */
+async function loadMsgs() {
+  if (!meUser) return;
+  const { data } = await db.from("messages").select("*")
+    .or(`from_user.eq.${meUser.id},to_user.eq.${meUser.id}`).order("created_at");
+  if (!data) return;
+  const prevIds = new Set(msgs.map(m => m.id));
+  const incoming = msgsLoadedOnce ? data.filter(m => !prevIds.has(m.id) && m.to_user === meUser.id && !m.read) : [];
+  msgs = data; msgsLoadedOnce = true;
+  if (incoming.length) {
+    sndMessage();
+    const senders = [...new Set(incoming.map(m => m.from_user))];
+    senders.forEach(sid => { if (!openChats.includes(sid)) openChats.push(sid); });
+    openChats.forEach(uid => {
+      if (!minimized.has(uid)) { markRead(uid); msgs.forEach(m => { if (m.from_user === uid && m.to_user === meUser.id) m.read = true; }); }
+    });
+  }
+  renderChats(); renderTeam();
+}
+
+async function markRead(fromId) {
+  await db.from("messages").update({ read: true }).eq("from_user", fromId).eq("to_user", meUser.id).eq("read", false);
+}
+
+window.openChat = (uid) => {
+  const u = teamUsers.find(x => x.id === uid); if (!u) return;
+  if (!openChats.includes(uid)) openChats.push(uid);
+  minimized.delete(uid);
+  markRead(uid);
+  msgs.forEach(m => { if (m.from_user === uid && m.to_user === meUser.id) m.read = true; });
+  focusUid = uid;
+  renderChats(); renderTeam();
+};
+window.closeChat = (uid) => {
+  openChats = openChats.filter(x => x !== uid);
+  minimized.delete(uid); delete drafts[uid];
+  if (focusUid === uid) focusUid = null;
+  renderChats();
+};
+window.minimizeChat = (uid) => { minimized.add(uid); if (focusUid === uid) focusUid = null; renderChats(); };
+window.restoreChat = (uid) => {
+  minimized.delete(uid); markRead(uid);
+  msgs.forEach(m => { if (m.from_user === uid && m.to_user === meUser.id) m.read = true; });
+  focusUid = uid; renderChats(); renderTeam();
+};
+
+function syncDrafts() { openChats.forEach(uid => { const i = $("text-" + uid); if (i) drafts[uid] = i.value; }); }
+
+function renderChats() {
+  if (!meUser) return;
+  syncDrafts();
+  $("desk-hint").style.display = openChats.length ? "none" : "flex";
+  const dock = $("chat-dock"); if (!dock) return;
+  dock.innerHTML = openChats.map(uid => {
+    const u = teamUsers.find(x => x.id === uid); if (!u) return "";
+    const st = userStatus(u);
+    const unread = msgs.filter(m => m.from_user === uid && m.to_user === meUser.id && !m.read).length;
+    if (minimized.has(uid)) {
+      return `<div class="chat chat-min">
+        <div class="chat-head" onclick="restoreChat('${uid}')">
+          <span class="status ${st}"></span>
+          <b>${esc(sname(u))}</b>
+          ${unread ? `<span class="badge">${unread}</span>` : ""}
+          <button class="ghost" onclick="event.stopPropagation();closeChat('${uid}')" title="Close">✕</button>
+        </div>
+      </div>`;
+    }
+    if (st !== "away") delete awayReplied[uid];
+    const thread = msgs.filter(m =>
+      (m.from_user === meUser.id && m.to_user === uid) || (m.from_user === uid && m.to_user === meUser.id));
+    let body = thread.length
+      ? thread.map(m => {
+          const mine = m.from_user === meUser.id;
+          const attHtml = m.att_path
+            ? (m.att_mime && m.att_mime.startsWith("image/")
+                ? `<img class="im-img" src="${attUrl(m.att_path)}" alt="${esc(m.att_name)}" onclick="openLightbox(this.src, this.alt)">`
+                : `<a class="filechip" href="${attUrl(m.att_path)}" target="_blank" download="${esc(m.att_name)}">📎 ${esc(m.att_name)}</a>`)
+            : "";
+          return `<div class="msg ${mine ? "mine" : "theirs"}"><span class="sn">${esc(mine ? sname(meUser) : sname(u))}:</span> ${linkify(m.body)}${attHtml}<span class="t">${new Date(m.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>`;
+        }).join("")
+      : `<div class="msg theirs"><span class="sn">${esc(sname(u))}</span> is ${st === "off" ? "offline" : "online"}. Say hi.</div>`;
+    if (awayReplied[uid] && st === "away") {
+      const ar = awayReplied[uid];
+      body += `<div class="msg theirs auto"><span class="sn">${esc(sname(u))}:</span> <b>Away</b> <i>${linkify(ar.msg)}</i><span class="t">${new Date(ar.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>`;
+    }
+    return `<div class="chat">
+      <div class="chat-head">
+        <span class="status ${st}"></span>
+        <b>${esc(sname(u))}</b>
+        <button class="ghost" onclick="minimizeChat('${uid}')" title="Minimize">_</button>
+        <button class="ghost" onclick="closeChat('${uid}')" title="Close">✕</button>
+      </div>
+      <div class="chat-msgs" id="msgs-${uid}">${body}</div>
+      <div class="chat-input">
+        <label class="chat-attach" title="Send a file or picture">📎<input type="file" hidden onchange="sendFile('${uid}', this)"></label>
+        <input id="text-${uid}" placeholder="Type a message…" maxlength="1000"
+          onfocus="focusUid='${uid}'" oninput="drafts['${uid}']=this.value"
+          onkeydown="if(event.key==='Enter')sendMsg('${uid}')">
+        <button class="primary" onclick="sendMsg('${uid}')">Send</button>
+      </div>
+    </div>`;
+  }).join("");
+  openChats.forEach(uid => {
+    if (minimized.has(uid)) return;
+    const i = $("text-" + uid); if (i) i.value = drafts[uid] || "";
+    const b = $("msgs-" + uid); if (b) b.scrollTop = b.scrollHeight;
+  });
+  if (focusUid && openChats.includes(focusUid) && !minimized.has(focusUid)) {
+    const el = $("text-" + focusUid);
+    if (el) { el.focus(); const v = el.value; el.setSelectionRange(v.length, v.length); }
+  }
+}
+
+function triggerAwayReply(uid) {
+  const u = teamUsers.find(x => x.id === uid);
+  if (u && userStatus(u) === "away" && u.away_message) awayReplied[uid] = { msg: u.away_message, at: Date.now() };
+}
+
+const attUrl = (path) => db.storage.from("attachments").getPublicUrl(path).data.publicUrl;
+
+window.sendFile = async (uid, input) => {
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert("Max file size is 10 MB."); return; }
+  const path = `dm/${meUser.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+  const { error } = await db.storage.from("attachments").upload(path, file);
+  input.value = "";
+  if (error) { alert("Upload failed: " + error.message); return; }
+  sndSent();
+  await db.from("messages").insert({ from_user: meUser.id, to_user: uid, body: "", att_path: path, att_name: file.name, att_mime: file.type || null });
+  triggerAwayReply(uid);
+  loadMsgs();
+};
+
+window.sendMsg = async (uid) => {
+  const inp = $("text-" + uid); if (!inp) return;
+  const body = inp.value.trim(); if (!body) return;
+  inp.value = ""; drafts[uid] = "";
+  sndSent();
+  await db.from("messages").insert({ from_user: meUser.id, to_user: uid, body });
+  triggerAwayReply(uid);
+  loadMsgs();
+};
+
+window.openLightbox = (url, name) => { $("lb-img").src = url; $("lb-name").textContent = name || ""; $("lightbox").classList.remove("hidden"); };
+window.closeLightbox = () => { $("lightbox").classList.add("hidden"); $("lb-img").src = ""; };
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeLightbox(); });
+
+window.editUsername = async () => {
+  const v = prompt("Choose your screen name:", sname(meUser));
+  if (v === null) return;
+  const un = v.trim().slice(0, 24); if (!un) return;
+  await db.from("users").update({ username: un }).eq("id", meUser.id);
+  meUser.username = un; $("me-name").textContent = un;
+  loadUsers(); renderChats();
+};
+
+$("acct-create").onclick = async () => {
+  const name = $("acct-name").value.trim(); if (!name) return;
+  const pin = $("acct-pin").value.trim();
+  if (pin.length < 4) { alert("Choose a passcode (at least 4 characters) so only you can log in as this profile."); return; }
+  const row = {
+    name,
+    username: $("acct-username").value.trim().slice(0, 24) || null,
+    email: $("acct-email").value.trim() || null,
+    title: $("acct-title").value.trim() || null,
+    color: acctColor,
+    pin_hash: await hashPin(pin),
+  };
+  let { data, error } = await db.from("users").insert(row).select().single();
+  if (error && /column|schema cache/i.test(error.message || "")) {
+    delete row.pin_hash;
+    ({ data, error } = await db.from("users").insert(row).select().single());
+    if (!error) alert("Profile created, but passcodes aren't enforced yet — run the pin_hash column SQL in Supabase (see index.html CONFIG).");
+  }
+  if (error) { alert("Could not create profile: " + error.message); return; }
+  meUser = data;
+  localStorage.setItem("tb_user_id", data.id);
+  $("account-modal").classList.add("hidden");
+  start();
+};
+$("acct-name").addEventListener("keydown", e => { if (e.key === "Enter") $("acct-pin").focus(); });
+$("acct-pin").addEventListener("keydown", e => { if (e.key === "Enter") $("acct-create").click(); });
+
+$("btn-switch").onclick = () => { localStorage.removeItem("tb_user_id"); location.reload(); };
+$("btn-presence").onclick = (e) => { e.stopPropagation(); $("pmenu").classList.toggle("hidden"); };
+addEventListener("click", () => $("pmenu").classList.add("hidden"));
+
+init();
+</script>
+</body>
+</html>
