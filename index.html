@@ -280,17 +280,27 @@ function tone(freq, dur, opts = {}) {
     o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
   } catch (e) {}
 }
-// Optional custom sound files: drop imrecv.mp3, imsend.mp3, dooropen.mp3 and
-// doorclose.mp3 in the repo ROOT, right next to index.html — no folder needed.
-// If any is missing, the synthesized fallback below plays instead.
+// Optional custom sound files. Put the mp3s either in the repo root OR in a
+// sounds/ folder — and either spelling of the AIM originals works. The first
+// candidate that actually loads wins; if none do, the synth fallback plays.
+const SND_SRC = {
+  imrecv:    ["sounds/imrecv.mp3", "imrecv.mp3", "sounds/imrcv.mp3", "imrcv.mp3"],
+  imsend:    ["sounds/imsend.mp3", "imsend.mp3"],
+  dooropen:  ["sounds/dooropen.mp3", "dooropen.mp3"],
+  doorclose: ["sounds/doorclose.mp3", "doorclose.mp3", "sounds/doorslam.mp3", "doorslam.mp3"],
+};
 const customSnd = {};
-["imrecv", "imsend", "dooropen", "doorclose"].forEach(n => {
-  const a = new Audio(n + ".mp3");
+function loadSnd(name, list, i) {
+  if (i >= list.length) { customSnd[name] = null; return; }   // none found — use synth
+  const a = new Audio(list[i]);
   a.preload = "auto";
-  customSnd[n] = a;                 // assume present; drop only if it truly fails
-  a.addEventListener("error", () => { customSnd[n] = null; }, { once: true });
+  const ok = () => { customSnd[name] = a; };
+  a.addEventListener("loadeddata", ok, { once: true });
+  a.addEventListener("canplaythrough", ok, { once: true });
+  a.addEventListener("error", () => loadSnd(name, list, i + 1), { once: true });
   a.load();
-});
+}
+Object.keys(SND_SRC).forEach(n => loadSnd(n, SND_SRC[n], 0));
 function play(n, fb) {
   const a = customSnd[n];
   if (a) {
