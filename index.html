@@ -280,16 +280,29 @@ function tone(freq, dur, opts = {}) {
     o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
   } catch (e) {}
 }
-// Optional custom sound files: drop imrecv.mp3, imsend.mp3, dooropen.mp3 and
-// doorclose.mp3 in the repo root (next to index.html) and they're used
-// automatically; otherwise the synthesized fallbacks below play.
+// Optional custom sound files: put imrecv.mp3, imsend.mp3, dooropen.mp3 and
+// doorclose.mp3 in a sounds/ folder in the repo and they're used automatically;
+// otherwise the synthesized fallbacks below play.
 const customSnd = {};
 ["imrecv", "imsend", "dooropen", "doorclose"].forEach(n => {
-  const a = new Audio(n + ".mp3");
-  a.addEventListener("canplaythrough", () => { customSnd[n] = a; }, { once: true });
-  a.addEventListener("error", () => {}, { once: true });
+  const a = new Audio("sounds/" + n + ".mp3");
+  a.preload = "auto";
+  customSnd[n] = a;                 // assume present; drop only if it truly fails
+  a.addEventListener("error", () => { customSnd[n] = null; }, { once: true });
+  a.load();
 });
-function play(n, fb) { const a = customSnd[n]; if (a) { try { a.currentTime = 0; a.play(); return; } catch (e) {} } fb(); }
+function play(n, fb) {
+  const a = customSnd[n];
+  if (a) {
+    try {
+      a.currentTime = 0;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => fb());
+      return;
+    } catch (e) {}
+  }
+  fb();
+}
 function sndMessage() { play("imrecv", () => { tone(1319, 0.10, { vol: 0.06 }); tone(1319, 0.16, { vol: 0.05, delay: 0.11 }); }); }
 function sndSent() { play("imsend", () => { tone(330, 0.07, { type: "square", vol: 0.05 }); tone(165, 0.10, { type: "triangle", vol: 0.06, delay: 0.02 }); }); }
 function sndDoorOpen() { play("dooropen", () => { tone(110, 0.35, { type: "sawtooth", vol: 0.05, slideTo: 260 }); tone(55, 0.30, { type: "triangle", vol: 0.05, slideTo: 110 }); }); }
