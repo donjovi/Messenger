@@ -13,6 +13,7 @@
     --bar: #ececed;                        /* gray footer (bottom) */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #2b2c30; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
     background: #2b2c30;
@@ -124,8 +125,8 @@
   .chat:hover .tl { color: rgba(0,0,0,.5); }
 
   /* buddy icons */
-  .avatar { width: 22px; height: 22px; min-width: 22px; border-radius: 6px; object-fit: cover; border: 1px solid rgba(0,0,0,.12); background: #fff; }
-  .avatar-lg { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(0,0,0,.12); background: #fff; }
+  .avatar { width: 22px; height: 22px; min-width: 22px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(0,0,0,.12); background: #fff; }
+  .avatar-lg { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(0,0,0,.12); background: #fff; }
   .icon-drop { display: flex; align-items: center; gap: 12px; }
   .chat-head b { flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat-head .badge { background: var(--red); color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 6px; }
@@ -231,6 +232,41 @@
   .cf-day::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #34363a; }
   .cf-day span { position: relative; z-index: 1; background: #202124; color: #9a9aa2; font-size: 11px; font-weight: 700; padding: 0 12px; }
 
+  /* group thread — big header + Basecamp-style dark posts */
+  .chat.room .chat-head.room-head { align-items: flex-start; gap: 12px; padding: 14px 14px 12px; background: #26272b; cursor: default; }
+  .room-head .tl { margin-top: 3px; }
+  .room-av-wrap { position: relative; cursor: pointer; flex: 0 0 auto; line-height: 0; }
+  .room-av { width: 52px; height: 52px; min-width: 52px; border-radius: 50%; object-fit: cover; border: 1px solid #000; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; background: #3a3c42; }
+  .room-av-edit { position: absolute; right: -2px; bottom: -2px; background: #0a84ff; color: #fff; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 2px solid #26272b; }
+  .room-meta { flex: 1; min-width: 0; text-align: left; }
+  .room-title { display: flex; align-items: center; gap: 6px; }
+  .room-title b { font-size: 18px; font-weight: 800; color: #f2f2f4; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-title .head-btn { color: #9a9aa2; font-size: 12px; }
+  .room-sub { font-size: 12px; color: #9a9aa2; margin-top: 3px; }
+  .chat.room .head-actions { align-self: flex-start; margin-top: 3px; }
+  .chat.room .head-btn { color: #cfcfd6; }
+  .gm { display: flex; gap: 10px; padding: 8px 4px; align-items: flex-start; }
+  .gm:hover { background: rgba(255,255,255,.03); border-radius: 8px; }
+  .gm-av { width: 34px; height: 34px; min-width: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #000; }
+  .gm-main { flex: 1; min-width: 0; }
+  .gm-head { display: flex; align-items: baseline; gap: 8px; }
+  .gm-head b { color: #f0f0f2; font-weight: 700; font-size: 13px; }
+  .gm-time { font-size: 11px; color: #8a8f98; }
+  .gm-reply { font-size: 12px; color: #8a8f98; border-left: 2px solid #4a4c50; padding: 1px 0 1px 8px; margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gm-reply b { color: #b6bcc6; }
+  .gm-body { color: #e6e6e8; font-size: 13px; line-height: 1.5; overflow-wrap: break-word; margin-top: 1px; }
+  .gm-body a { color: #7fb2ff; }
+  .gm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; }
+  .gm-btn { border: none; background: none; box-shadow: none; color: #8a8f98; font-size: 12px; padding: 2px 6px; border-radius: 6px; cursor: pointer; opacity: 0; }
+  .gm:hover .gm-btn { opacity: 1; }
+  .gm-btn:hover { background: rgba(255,255,255,.08); color: #cfcfd6; }
+  .rx-pill { border: 1px solid #3a3c42; background: #2c2e33; color: #dcdce0; font-size: 12px; padding: 1px 8px; border-radius: 999px; cursor: pointer; }
+  .rx-pill.mine { background: #22344d; border-color: #2f6fd0; color: #cfe1ff; }
+  .rx-pill:hover { border-color: #6a6c72; }
+  .reply-banner { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #cfcfd6; background: #26272a; border-top: 1px solid #000; padding: 6px 12px; }
+  .reply-banner b { color: #fff; }
+  .reply-banner button { margin-left: auto; border: none; background: none; box-shadow: none; color: #9a9aa2; cursor: pointer; font-size: 12px; }
+
   /* lightbox */
   .lightbox { position: fixed; inset: 0; background: rgba(15,17,21,.88); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 30px; cursor: zoom-out; }
   .lightbox img { max-width: 92vw; max-height: 86vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
@@ -296,7 +332,6 @@
 </div>
 
 <div class="desk hidden" id="app">
-  <div class="desk-hint" id="desk-hint">Click a buddy to start a conversation.</div>
   <aside class="buddy-window">
     <div class="tp-title">👥 Buddy List <span style="flex:1"></span>
       <button class="mini" onclick="openGroupModal()" title="Start a group chat">＋ Group</button></div>
@@ -393,6 +428,17 @@ const CONFIG = {
      create policy "open" on rooms for all using (true) with check (true);
      create policy "open" on room_members for all using (true) with check (true);
 
+   Group replies + reactions:
+
+     alter table messages add column if not exists reply_to uuid references messages(id) on delete set null;
+     create table if not exists reactions (
+       message_id uuid references messages(id) on delete cascade,
+       user_id uuid references users(id) on delete cascade,
+       emoji text, created_at timestamptz default now(),
+       primary key (message_id, user_id, emoji));
+     alter table reactions enable row level security;
+     create policy "open" on reactions for all using (true) with check (true);
+
    Then make yourself the admin (only admins can remove users) —
    change the name to match your profile exactly:
 
@@ -426,6 +472,10 @@ function resolveTarget(tid) {
   const { kind, id } = T(tid);
   return kind === "r" ? rooms.find(r => r.id === id) : teamUsers.find(u => u.id === id);
 }
+
+/* group thread extras */
+let reactions = [];          // rows from the reactions table for loaded messages
+const replyTarget = {};      // tid -> {id, name} message being replied to
 
 /* chat window positions {tid: {x, y}} — remembered between visits */
 let winPos = {};
@@ -538,7 +588,8 @@ function linkify(s) { return renderBody(s); }
 
 /* ---------- formatting state + emoji picker ---------- */
 const fmtState = {};   // {uid: {b,i,u}}
-let emojiFor = null;   // which chat window the picker is inserting into
+let emojiFor = null;       // which chat window the picker is inserting into
+let emojiReactMsg = null;  // if set, picker adds a reaction to this message id instead
 
 window.toggleFmt = (uid, k) => {
   const f = fmtState[uid] || (fmtState[uid] = { b: false, i: false, u: false });
@@ -547,21 +598,29 @@ window.toggleFmt = (uid, k) => {
   const el = $("text-" + uid); if (el) el.focus();
 };
 
-window.openEmoji = (e, uid) => {
-  e.stopPropagation();
-  emojiFor = uid;
+function showEmojiPop(e) {
   const pop = $("emoji-pop");
   pop.classList.remove("hidden");
   const r = e.currentTarget.getBoundingClientRect();
-  const x = Math.max(8, Math.min(window.innerWidth - 312, r.left - 140));
-  const y = Math.max(8, r.top - 298);
+  const x = Math.max(8, Math.min(window.innerWidth - 320, r.left - 140));
+  const y = Math.max(8, Math.min(window.innerHeight - 308, r.top - 298 < 8 ? r.bottom + 6 : r.top - 298));
   pop.style.left = x + "px";
   pop.style.top = y + "px";
   $("emoji-search").value = "";
   renderEmoji("");
   $("emoji-search").focus();
+}
+window.openEmoji = (e, uid) => {
+  e.stopPropagation();
+  emojiFor = uid; emojiReactMsg = null;
+  showEmojiPop(e);
 };
-window.closeEmoji = () => { $("emoji-pop").classList.add("hidden"); emojiFor = null; };
+window.openReactPicker = (e, msgId) => {
+  e.stopPropagation();
+  emojiReactMsg = msgId; emojiFor = null;
+  showEmojiPop(e);
+};
+window.closeEmoji = () => { $("emoji-pop").classList.add("hidden"); emojiFor = null; emojiReactMsg = null; };
 
 window.renderEmoji = (q) => {
   q = (q || "").trim().toLowerCase();
@@ -573,6 +632,7 @@ window.renderEmoji = (q) => {
 };
 
 window.insertEmoji = (ch) => {
+  if (emojiReactMsg) { addReaction(emojiReactMsg, ch); closeEmoji(); return; }
   const uid = emojiFor; if (!uid) return;
   const el = $("text-" + uid); if (!el) return;
   const s = el.selectionStart ?? el.value.length, e2 = el.selectionEnd ?? el.value.length;
@@ -581,6 +641,28 @@ window.insertEmoji = (ch) => {
   const caret = s + ch.length;
   el.focus(); el.setSelectionRange(caret, caret);
 };
+
+/* reactions + replies */
+window.addReaction = async (messageId, emoji) => {
+  const mine = reactions.find(r => r.message_id === messageId && r.user_id === meUser.id && r.emoji === emoji);
+  if (mine) {
+    reactions = reactions.filter(r => r !== mine); renderChats();
+    await db.from("reactions").delete().eq("message_id", messageId).eq("user_id", meUser.id).eq("emoji", emoji);
+  } else {
+    reactions.push({ message_id: messageId, user_id: meUser.id, emoji }); renderChats();
+    const { error } = await db.from("reactions").insert({ message_id: messageId, user_id: meUser.id, emoji });
+    if (error && /relation|does not exist|schema cache|table/i.test(error.message || "")) alert("Reactions need their table — run the reactions SQL from index.html's CONFIG notes.");
+  }
+  loadReactions();
+};
+window.setReply = (tid, messageId) => {
+  const m = msgs.find(x => x.id === messageId); if (!m) return;
+  const nm = m.from_user === meUser.id ? sname(meUser) : ((teamUsers.find(u => u.id === m.from_user) || {}).name || "Someone");
+  replyTarget[tid] = { id: messageId, name: nm };
+  focusUid = tid;
+  renderChats();
+};
+window.clearReply = (tid) => { delete replyTarget[tid]; renderChats(); };
 async function hashPin(pin) {
   const s = "tb:" + pin;
   try {
@@ -664,6 +746,7 @@ function start() {
     .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, loadMsgs)
     .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, loadRooms)
     .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, loadRooms)
+    .on("postgres_changes", { event: "*", schema: "public", table: "reactions" }, loadReactions)
     .subscribe();
 }
 
@@ -913,6 +996,15 @@ async function loadMsgs() {
     openChats.forEach(tid => { if (!minimized.has(tid)) seen(tid); });
   }
   renderChats(); renderTeam();
+  loadReactions();
+}
+
+async function loadReactions() {
+  if (!meUser || !msgs.length) { reactions = []; return; }
+  const { data, error } = await db.from("reactions").select("*").in("message_id", msgs.map(m => m.id));
+  if (error) { reactions = []; return; }   // reactions table not set up yet
+  reactions = data || [];
+  renderChats();
 }
 
 async function markRead(fromId) {
@@ -957,7 +1049,6 @@ function syncDrafts() { openChats.forEach(tid => { const i = $("text-" + tid); i
 function renderChats() {
   if (!meUser) return;
   syncDrafts();
-  $("desk-hint").style.display = openChats.length ? "none" : "flex";
   const dock = $("chat-dock"); if (!dock) return;
   const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const uname = (uid) => { const x = teamUsers.find(u => u.id === uid); return x ? sname(x) : "Someone"; };
@@ -1002,29 +1093,39 @@ function renderChats() {
       : "";
     let body;
     if (isRoom) {
-      // dark Campfire-style: avatar + name + time, bubbles grouped by sender
+      // Basecamp-style thread: circular avatar, name, time, replies + reactions
       if (!thread.length) {
-        body = `<div class="cf-empty">Say hi to the group 👋</div>`;
+        body = `<div class="cf-empty">No messages yet — say hi to the group 👋</div>`;
       } else {
-        let html = "", cur = null, curDay = null, open = false;
-        const closeCol = () => { if (open) { html += "</div></div>"; open = false; } };
+        const nameOf = (uid) => { const x = teamUsers.find(u => u.id === uid); return x ? sname(x) : "Someone"; };
+        const userOf = (uid) => (uid === meUser.id ? meUser : (teamUsers.find(u => u.id === uid) || { name: "Someone" }));
         const dayStr = (ts) => new Date(ts).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+        let html = "", curDay = null;
         for (const m of thread) {
-          const mine = m.from_user === meUser.id;
           const d = dayStr(m.created_at);
-          if (d !== curDay) { closeCol(); cur = null; curDay = d; html += `<div class="cf-day"><span>${esc(d)}</span></div>`; }
-          if (m.from_user !== cur) {
-            closeCol(); cur = m.from_user;
-            const who = mine ? meUser : (teamUsers.find(u => u.id === m.from_user) || { name: "Someone" });
-            const meta = mine
-              ? `<span class="cf-meta">${clock(m.created_at)} <b>Me</b></span>`
-              : `<span class="cf-meta"><b>${esc(sname(who))}</b> ${clock(m.created_at)}</span>`;
-            html += `<div class="cf-row ${mine ? "mine" : "theirs"}">${avatarImg(who, "cf-av")}<div class="cf-col">${meta}`;
-            open = true;
+          if (d !== curDay) { curDay = d; html += `<div class="cf-day"><span>${esc(d)}</span></div>`; }
+          const who = userOf(m.from_user);
+          let replyHtml = "";
+          if (m.reply_to) {
+            const pm = msgs.find(x => x.id === m.reply_to);
+            if (pm) replyHtml = `<div class="gm-reply">↩ <b>${esc(pm.from_user === meUser.id ? sname(meUser) : nameOf(pm.from_user))}</b> ${esc((pm.body || "📎 attachment").slice(0, 70))}</div>`;
           }
-          html += `<div class="cf-bub">${linkify(m.body)}${attOf(m)}</div>`;
+          const byEmoji = {};
+          reactions.filter(r => r.message_id === m.id).forEach(r => { (byEmoji[r.emoji] = byEmoji[r.emoji] || []).push(r.user_id); });
+          const pills = Object.keys(byEmoji).map(em => {
+            const uids = byEmoji[em];
+            return `<button class="rx-pill ${uids.includes(meUser.id) ? "mine" : ""}" title="${esc(uids.map(nameOf).join(", "))}" onclick="addReaction('${m.id}','${em}')">${em} ${uids.length}</button>`;
+          }).join("");
+          html += `<div class="gm">
+            ${avatarImg(who, "gm-av")}
+            <div class="gm-main">
+              <div class="gm-head"><b>${esc(sname(who))}</b><span class="gm-time">${clock(m.created_at)}</span></div>
+              ${replyHtml}
+              <div class="gm-body">${linkify(m.body)}${attOf(m)}</div>
+              <div class="gm-actions">${pills}<button class="gm-btn" onclick="openReactPicker(event,'${m.id}')" title="Add reaction">☺﹢</button><button class="gm-btn" onclick="setReply('${tid}','${m.id}')" title="Reply">↩ Reply</button></div>
+            </div>
+          </div>`;
         }
-        closeCol();
         body = html;
       }
     } else {
@@ -1047,7 +1148,10 @@ function renderChats() {
         <button class="fmt-btn ${f.u ? "on" : ""}" onmousedown="event.stopPropagation()" onclick="toggleFmt('${tid}','u')" title="Underline"><u>U</u></button>
         <button class="fmt-btn" onmousedown="event.stopPropagation()" onclick="openEmoji(event,'${tid}')" title="Emoji" style="font-family:inherit">😀</button>
       </div>`;
-    const inputBar = `<div class="chat-input">
+    const replyBanner = (isRoom && replyTarget[tid])
+      ? `<div class="reply-banner">↩ Replying to <b>${esc(replyTarget[tid].name)}</b><button onclick="clearReply('${tid}')" title="Cancel reply">✕</button></div>`
+      : "";
+    const inputBar = `${replyBanner}<div class="chat-input">
         <label class="chat-attach" title="Send a file or picture">📎<input type="file" hidden onchange="sendFile('${tid}', this)"></label>
         <input id="text-${tid}" placeholder="${isRoom ? "Message the group…" : "Type a message…"}" maxlength="1000"
           onfocus="focusUid='${tid}'" oninput="drafts['${tid}']=this.value"
@@ -1056,14 +1160,19 @@ function renderChats() {
       </div>`;
     if (isRoom) {
       // large centered Basecamp-style window (dimmed page behind, not full screen)
+      const created = tgt.created_at ? new Date(tgt.created_at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "";
+      const gAvatar = tgt.avatar_path
+        ? `<img class="room-av" src="${avatarUrl(tgt.avatar_path)}" alt="">`
+        : `<span class="room-av grp-ic">👥</span>`;
       return `<div class="chat room" id="win-${tid}" onmousedown="bringToFront('${tid}')">
-        <div class="chat-head">
+        <div class="chat-head room-head">
           <button class="tl tl-red" onclick="closeChat('${tid}')" title="Close">×</button>
-          ${headIcon}
-          <b>${title}</b>
+          <label class="room-av-wrap" title="Change group graphic">${gAvatar}<span class="room-av-edit">🖼</span><input type="file" accept="image/*" hidden onchange="uploadGroupAvatar('${id}', this)"></label>
+          <div class="room-meta">
+            <div class="room-title"><b onclick="renameGroup('${id}')" title="Click to rename">${title}</b><button class="head-btn" onclick="renameGroup('${id}')" title="Rename group">✎</button></div>
+            <div class="room-sub">${created ? created + " · " : ""}Group Members: ${tgt.members.length}</div>
+          </div>
           <span class="head-actions">
-            <button class="head-btn" onclick="renameGroup('${id}')" title="Rename group">✎</button>
-            <label class="head-btn" title="Set group graphic">🖼<input type="file" accept="image/*" hidden onchange="uploadGroupAvatar('${id}', this)"></label>
             <button class="head-btn" onclick="addToGroup('${id}')" title="Add buddies">＋</button>
             <button class="head-btn" onclick="leaveGroup('${id}')" title="Leave / end group">🚪</button>
           </span>
@@ -1138,7 +1247,13 @@ window.sendMsg = async (tid) => {
   const { kind, id } = T(tid);
   const row = { from_user: meUser.id, body };
   if (kind === "r") row.room_id = id; else row.to_user = id;
-  await db.from("messages").insert(row);
+  if (replyTarget[tid]) row.reply_to = replyTarget[tid].id;
+  delete replyTarget[tid];
+  let { error } = await db.from("messages").insert(row);
+  if (error && /column|schema cache/i.test(error.message || "") && row.reply_to) {
+    delete row.reply_to;
+    await db.from("messages").insert(row);
+  }
   triggerAwayReply(tid); seen(tid);
   loadMsgs();
 };
