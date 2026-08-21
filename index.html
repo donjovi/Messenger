@@ -9,7 +9,7 @@
   :root {
     --bg: #eef1f5; --card: #fff; --ink: #1d1d1f; --muted: #86868b; --line: #e3e3e6;
     --accent: #0a84ff; --green: #30d158; --red: #ff453a;
-    --titlebar: rgba(242,242,244,0.9);   /* Finder gray bar (top) */
+    --titlebar: #edeef1;   /* Finder gray bar (top) — solid, no GPU blur dependency */
     --bar: #ececed;                        /* gray footer (bottom) */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -194,7 +194,16 @@
   .cf-empty { text-align: center; color: #8a8f98; font-size: 13px; padding: 26px 8px; }
 
   /* dark-mode group window (Campfire-style) */
-  .chat.room { background: #202124; border-color: #000; }
+  .chat.room {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(760px, 92vw); height: min(80vh, 780px);
+    background: #202124; border-color: #000; z-index: 120;
+  }
+  .chat.room .chat-head { padding: 10px 12px; cursor: default; }
+  .chat.room .chat-head .tl { margin-right: 6px; }
+  .chat.room .chat-head b { text-align: center; font-size: 14px; }
+  .chat.room .chat-head .grp-count { display: none; }
+  .room-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 110; pointer-events: none; }
   .chat.room .chat-head { background: #2a2b2f; border-bottom-color: #000; color: #eaeaec; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .chat.room .chat-head b { color: #f2f2f4; }
   .chat.room .head-btn { color: #cfcfd6; }
@@ -212,12 +221,15 @@
   .cf-av { width: 30px; height: 30px; min-width: 30px; border-radius: 6px; object-fit: cover; border: 1px solid #000; }
   .cf-col { display: flex; flex-direction: column; max-width: 76%; }
   .cf-row.mine .cf-col { align-items: flex-end; }
-  .cf-meta { font-size: 11px; color: #9a9aa2; margin: 0 3px 3px; }
+  .cf-meta { font-size: 11px; color: #9a9aa2; margin: 0 4px 3px; }
   .cf-meta b { color: #d6d6dc; }
-  .cf-bub { background: #303136; color: #e8e8ea; padding: 7px 11px; border-radius: 13px; line-height: 1.4; overflow-wrap: break-word; }
+  .cf-bub { background: #303136; color: #e8e8ea; padding: 8px 12px; border-radius: 10px; line-height: 1.45; overflow-wrap: break-word; }
   .cf-bub + .cf-bub { margin-top: 3px; }
   .cf-row.mine .cf-bub { background: #2f5a86; color: #eaf1fb; }
   .cf-bub a { color: #7fb2ff; }
+  .cf-day { text-align: center; margin: 4px 0 14px; position: relative; }
+  .cf-day::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #34363a; }
+  .cf-day span { position: relative; z-index: 1; background: #202124; color: #9a9aa2; font-size: 11px; font-weight: 700; padding: 0 12px; }
 
   /* lightbox */
   .lightbox { position: fixed; inset: 0; background: rgba(15,17,21,.88); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 30px; cursor: zoom-out; }
@@ -784,8 +796,9 @@ window.removeUser = async (id) => {
 /* ---------- draggable chat windows ---------- */
 let dragState = null;
 function defaultPos(i) {
-  const x = Math.max(12, window.innerWidth - 320 - 24 - i * 28);
-  const y = Math.max(12, window.innerHeight - 420 - 24 - i * 12);
+  const w = 460, h = 560;
+  const x = Math.max(12, window.innerWidth - w - 20 - i * 30);
+  const y = Math.max(12, window.innerHeight - h - 20 - i * 10);
   return { x, y };
 }
 window.bringToFront = (uid) => {
@@ -948,7 +961,7 @@ function renderChats() {
   const dock = $("chat-dock"); if (!dock) return;
   const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const uname = (uid) => { const x = teamUsers.find(u => u.id === uid); return x ? sname(x) : "Someone"; };
-  dock.innerHTML = openChats.map((tid, idx) => {
+  const winHTML = openChats.map((tid, idx) => {
     const tgt = resolveTarget(tid); if (!tgt) return "";
     const { kind, id } = T(tid);
     const isRoom = kind === "r";
@@ -993,10 +1006,13 @@ function renderChats() {
       if (!thread.length) {
         body = `<div class="cf-empty">Say hi to the group 👋</div>`;
       } else {
-        let html = "", cur = null, open = false;
+        let html = "", cur = null, curDay = null, open = false;
         const closeCol = () => { if (open) { html += "</div></div>"; open = false; } };
+        const dayStr = (ts) => new Date(ts).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
         for (const m of thread) {
           const mine = m.from_user === meUser.id;
+          const d = dayStr(m.created_at);
+          if (d !== curDay) { closeCol(); cur = null; curDay = d; html += `<div class="cf-day"><span>${esc(d)}</span></div>`; }
           if (m.from_user !== cur) {
             closeCol(); cur = m.from_user;
             const who = mine ? meUser : (teamUsers.find(u => u.id === m.from_user) || { name: "Someone" });
@@ -1025,38 +1041,55 @@ function renderChats() {
         body += `<div class="msg theirs auto"><span class="sn">${esc(sname(tgt))}:</span> <b>Away</b> <i>${linkify(ar.msg)}</i><span class="t">${clock(ar.at)}</span></div>`;
       }
     }
-    const greenTitle = isRoom ? `Members: ${tgt.members.map(uname).join(", ")}` : "Zoom";
-    return `<div class="chat ${isRoom ? "room" : ""}" id="win-${tid}" ${at} onmousedown="bringToFront('${tid}')">
-      <div class="chat-head" onmousedown="startDrag(event,'${tid}')">
-        <div class="tls">
-          <button class="tl tl-red" onmousedown="event.stopPropagation()" onclick="closeChat('${tid}')" title="Close">×</button>
-          <button class="tl tl-yellow" onmousedown="event.stopPropagation()" onclick="minimizeChat('${tid}')" title="Minimize">–</button>
-          <button class="tl tl-green" onmousedown="event.stopPropagation()" title="${esc(greenTitle)}" style="cursor:default"></button>
-        </div>
-        ${headIcon}
-        <b>${title}${isRoom ? ` <span class="grp-count">(${tgt.members.length})</span>` : ""}</b>
-        ${isRoom ? `<span class="head-actions">
-          <button class="head-btn" onmousedown="event.stopPropagation()" onclick="renameGroup('${id}')" title="Rename group">✎</button>
-          <label class="head-btn" onmousedown="event.stopPropagation()" title="Set group graphic">🖼<input type="file" accept="image/*" hidden onchange="uploadGroupAvatar('${id}', this)"></label>
-          <button class="head-btn" onmousedown="event.stopPropagation()" onclick="addToGroup('${id}')" title="Add buddies">＋</button>
-        </span>` : ""}
-      </div>
-      <div class="chat-msgs" id="msgs-${tid}">${body}</div>
-      <div class="chat-tools">
+    const toolsBar = `<div class="chat-tools">
         <button class="fmt-btn ${f.b ? "on" : ""}" onmousedown="event.stopPropagation()" onclick="toggleFmt('${tid}','b')" title="Bold"><b>B</b></button>
         <button class="fmt-btn ${f.i ? "on" : ""}" onmousedown="event.stopPropagation()" onclick="toggleFmt('${tid}','i')" title="Italic"><i>I</i></button>
         <button class="fmt-btn ${f.u ? "on" : ""}" onmousedown="event.stopPropagation()" onclick="toggleFmt('${tid}','u')" title="Underline"><u>U</u></button>
         <button class="fmt-btn" onmousedown="event.stopPropagation()" onclick="openEmoji(event,'${tid}')" title="Emoji" style="font-family:inherit">😀</button>
-      </div>
-      <div class="chat-input">
+      </div>`;
+    const inputBar = `<div class="chat-input">
         <label class="chat-attach" title="Send a file or picture">📎<input type="file" hidden onchange="sendFile('${tid}', this)"></label>
-        <input id="text-${tid}" placeholder="Type a message…" maxlength="1000"
+        <input id="text-${tid}" placeholder="${isRoom ? "Message the group…" : "Type a message…"}" maxlength="1000"
           onfocus="focusUid='${tid}'" oninput="drafts['${tid}']=this.value"
           onkeydown="if(event.key==='Enter')sendMsg('${tid}')">
         <button class="primary" onclick="sendMsg('${tid}')">Send</button>
+      </div>`;
+    if (isRoom) {
+      // large centered Basecamp-style window (dimmed page behind, not full screen)
+      return `<div class="chat room" id="win-${tid}" onmousedown="bringToFront('${tid}')">
+        <div class="chat-head">
+          <button class="tl tl-red" onclick="closeChat('${tid}')" title="Close">×</button>
+          ${headIcon}
+          <b>${title}</b>
+          <span class="head-actions">
+            <button class="head-btn" onclick="renameGroup('${id}')" title="Rename group">✎</button>
+            <label class="head-btn" title="Set group graphic">🖼<input type="file" accept="image/*" hidden onchange="uploadGroupAvatar('${id}', this)"></label>
+            <button class="head-btn" onclick="addToGroup('${id}')" title="Add buddies">＋</button>
+            <button class="head-btn" onclick="leaveGroup('${id}')" title="Leave / end group">🚪</button>
+          </span>
+        </div>
+        <div class="chat-msgs" id="msgs-${tid}">${body}</div>
+        ${toolsBar}
+        ${inputBar}
+      </div>`;
+    }
+    return `<div class="chat" id="win-${tid}" ${at} onmousedown="bringToFront('${tid}')">
+      <div class="chat-head" onmousedown="startDrag(event,'${tid}')">
+        <div class="tls">
+          <button class="tl tl-red" onmousedown="event.stopPropagation()" onclick="closeChat('${tid}')" title="Close">×</button>
+          <button class="tl tl-yellow" onmousedown="event.stopPropagation()" onclick="minimizeChat('${tid}')" title="Minimize">–</button>
+          <button class="tl tl-green" onmousedown="event.stopPropagation()" title="Zoom" style="cursor:default"></button>
+        </div>
+        ${headIcon}
+        <b>${title}</b>
       </div>
+      <div class="chat-msgs" id="msgs-${tid}">${body}</div>
+      ${toolsBar}
+      ${inputBar}
     </div>`;
   }).join("");
+  const roomOpen = openChats.some(tid => T(tid).kind === "r" && !minimized.has(tid) && resolveTarget(tid));
+  dock.innerHTML = (roomOpen ? `<div class="room-backdrop"></div>` : "") + winHTML;
   openChats.forEach(tid => {
     if (minimized.has(tid)) return;
     const i = $("text-" + tid); if (i) i.value = drafts[tid] || "";
@@ -1166,6 +1199,27 @@ window.uploadGroupAvatar = async (roomId, input) => {
   if (e2) { alert(/column|schema cache/i.test(e2.message || "") ? "Add the rooms.avatar_path column (see CONFIG notes) first." : "Could not save: " + e2.message); return; }
   const r = rooms.find(x => x.id === roomId); if (r) r.avatar_path = path;
   renderChats(); renderTeam();
+};
+
+window.leaveGroup = async (roomId) => {
+  const r = rooms.find(x => x.id === roomId); if (!r) return;
+  const amOwner = r.created_by === meUser.id || isAdmin();
+  const ok = confirm(amOwner
+    ? `End "${r.name || "this group"}" for everyone? This deletes the group and all its messages — can't be undone.`
+    : `Leave "${r.name || "this group"}"? You'll stop getting its messages.`);
+  if (!ok) return;
+  if (amOwner) {
+    await db.from("messages").delete().eq("room_id", roomId);
+    await db.from("room_members").delete().eq("room_id", roomId);
+    const { error } = await db.from("rooms").delete().eq("id", roomId);
+    if (error) { alert("Could not end group: " + error.message); return; }
+  } else {
+    const { error } = await db.from("room_members").delete().eq("room_id", roomId).eq("user_id", meUser.id);
+    if (error) { alert("Could not leave group: " + error.message); return; }
+  }
+  closeChat(rT(roomId));
+  delete winPos[rT(roomId)]; saveWinPos();
+  await loadRooms();
 };
 
 window.addToGroup = async (roomId) => {
