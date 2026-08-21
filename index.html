@@ -1197,8 +1197,7 @@ function renderChats() {
       ${inputBar}
     </div>`;
   }).join("");
-  const roomOpen = openChats.some(tid => T(tid).kind === "r" && !minimized.has(tid) && resolveTarget(tid));
-  dock.innerHTML = (roomOpen ? `<div class="room-backdrop"></div>` : "") + winHTML;
+  dock.innerHTML = winHTML;
   openChats.forEach(tid => {
     if (minimized.has(tid)) return;
     const i = $("text-" + tid); if (i) i.value = drafts[tid] || "";
