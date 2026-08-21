@@ -735,6 +735,7 @@ function start() {
   $("me-name").textContent = sname(meUser);
   $("me-dot").style.background = meUser.color || "#4b5563";
   updatePresenceBtn();
+  try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   loadUsers();
   loadRooms();   // loadRooms() calls loadMsgs() once it knows my groups
   updateMe({ status: meStatus, away_message: meStatus === "away" ? meAway : null, last_seen: meStatus === "invisible" ? null : new Date().toISOString() });
@@ -750,18 +751,44 @@ function start() {
     .subscribe();
 }
 
+let roomsInit = false;
+let knownRoomIds = new Set();
+
+function notify(title, body) {
+  try {
+    if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+      const n = new Notification(title, { body: body || "", tag: "msgr" });
+      n.onclick = () => { window.focus(); n.close(); };
+    }
+  } catch (e) {}
+}
+
 async function loadRooms() {
   if (!meUser) return;
   const { data: mine, error } = await db.from("room_members").select("room_id").eq("user_id", meUser.id);
   if (error) { rooms = []; loadMsgs(); return; }   // rooms tables not set up yet — app still works 1:1
   const ids = (mine || []).map(m => m.room_id);
-  if (!ids.length) { rooms = []; renderTeam(); loadMsgs(); return; }
-  const [{ data: rs }, { data: mem }] = await Promise.all([
-    db.from("rooms").select("*").in("id", ids),
-    db.from("room_members").select("*").in("room_id", ids),
-  ]);
-  rooms = (rs || []).map(r => ({ ...r, members: (mem || []).filter(x => x.room_id === r.id).map(x => x.user_id) }));
+  if (!ids.length) {
+    rooms = [];
+  } else {
+    const [{ data: rs }, { data: mem }] = await Promise.all([
+      db.from("rooms").select("*").in("id", ids),
+      db.from("room_members").select("*").in("room_id", ids),
+    ]);
+    rooms = (rs || []).map(r => ({ ...r, members: (mem || []).filter(x => x.room_id === r.id).map(x => x.user_id) }));
+  }
+  // pop + notify when you've just been added to a new group
+  if (roomsInit) {
+    rooms.filter(r => !knownRoomIds.has(r.id)).forEach(r => {
+      sndDoorOpen();
+      notify("Added to a group chat", `You're now in "${r.name || "a group chat"}"`);
+      if (!openChats.includes(rT(r.id))) openChats.push(rT(r.id));
+    });
+  }
+  knownRoomIds = new Set(rooms.map(r => r.id));
+  roomsInit = true;
   renderTeam();
+  renderChats();
   loadMsgs();
 }
 
@@ -992,6 +1019,10 @@ async function loadMsgs() {
   msgs = data; msgsLoadedOnce = true;
   if (incoming.length) {
     sndMessage();
+    const last = incoming[incoming.length - 1];
+    const sName = (teamUsers.find(u => u.id === last.from_user) || {}).name || "New message";
+    const gName = last.room_id ? (rooms.find(r => r.id === last.room_id) || {}).name : null;
+    notify(gName ? `${sName} · ${gName}` : sName, last.body || "📎 attachment");
     incoming.forEach(m => { const tid = m.room_id ? rT(m.room_id) : uT(m.from_user); if (!openChats.includes(tid)) openChats.push(tid); });
     openChats.forEach(tid => { if (!minimized.has(tid)) seen(tid); });
   }
